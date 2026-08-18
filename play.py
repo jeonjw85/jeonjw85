@@ -6,7 +6,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
 import re
 import sys
@@ -191,8 +190,7 @@ def _board(board: chess.Board, history: tuple[tuple[str, str, str], ...]) -> str
         ),
         encoding="utf-8",
     )
-    bust = hashlib.sha1(board.fen().encode()).hexdigest()[:8]
-    return f'<img src="board.svg?v={bust}" width="{BOARD_PX}" alt="chess board" />'
+    return f'<img src="board.svg" width="{BOARD_PX}" alt="chess board" />'
 
 
 def _moves(board: chess.Board, repo: str) -> str:

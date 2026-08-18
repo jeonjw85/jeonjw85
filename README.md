@@ -1,7 +1,7 @@
 Move a **<!-- BEGIN TURN -->black<!-- END TURN -->** piece.
 
 <!-- BEGIN CHESS BOARD -->
-<img src="board.svg?v=e6ba260a" width="520" alt="chess board" />
+<img src="board.svg" width="520" alt="chess board" />
 <!-- END CHESS BOARD -->
 
 <!-- BEGIN MOVES LIST -->
