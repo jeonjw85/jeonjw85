@@ -1,8 +1,15 @@
 Move a **<!-- BEGIN TURN -->black<!-- END TURN -->** piece.
 
+<table>
+<tr>
+<td valign="top">
+
 <!-- BEGIN CHESS BOARD -->
 <img src="board-e6ba260a.svg" width="520" alt="chess board" />
 <!-- END CHESS BOARD -->
+
+</td>
+<td valign="top">
 
 <!-- BEGIN MOVES LIST -->
 | FROM | TO |
@@ -18,3 +25,7 @@ Move a **<!-- BEGIN TURN -->black<!-- END TURN -->** piece.
 | **G8** | [F6](https://github.com/jeonjw85/jeonjw85/issues/new?title=Chess%3A%20Move%20G8%20to%20F6&body=Just%20click%20Submit%20new%20issue%21%21%20Do%20not%20change%20the%20title.), [H6](https://github.com/jeonjw85/jeonjw85/issues/new?title=Chess%3A%20Move%20G8%20to%20H6&body=Just%20click%20Submit%20new%20issue%21%21%20Do%20not%20change%20the%20title.) |
 | **H7** | [H5](https://github.com/jeonjw85/jeonjw85/issues/new?title=Chess%3A%20Move%20H7%20to%20H5&body=Just%20click%20Submit%20new%20issue%21%21%20Do%20not%20change%20the%20title.), [H6](https://github.com/jeonjw85/jeonjw85/issues/new?title=Chess%3A%20Move%20H7%20to%20H6&body=Just%20click%20Submit%20new%20issue%21%21%20Do%20not%20change%20the%20title.) |
 <!-- END MOVES LIST -->
+
+</td>
+</tr>
+</table>
