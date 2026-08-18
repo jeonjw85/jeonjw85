@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import sys
@@ -20,7 +21,6 @@ import chess.svg
 ROOT: Final = Path(__file__).resolve().parent
 GAME_PATH: Final = ROOT / "data" / "game.json"
 README_PATH: Final = ROOT / "README.md"
-BOARD_PATH: Final = ROOT / "board.svg"
 BOARD_PX: Final = 520
 MOVE_RE: Final = re.compile(
     r"^chess:\s*move\s+([a-h][1-8])\s+to\s+([a-h][1-8])\s*$", re.IGNORECASE
@@ -180,7 +180,9 @@ def _board(board: chess.Board, history: tuple[tuple[str, str, str], ...]) -> str
     lastmove = None
     if history and history[0][0] == "move":
         lastmove = chess.Move.from_uci(history[0][2])
-    BOARD_PATH.write_text(
+    digest = hashlib.sha1(board.fen().encode()).hexdigest()[:8]
+    path = ROOT / f"board-{digest}.svg"
+    path.write_text(
         chess.svg.board(
             board,
             size=BOARD_PX,
@@ -190,7 +192,10 @@ def _board(board: chess.Board, history: tuple[tuple[str, str, str], ...]) -> str
         ),
         encoding="utf-8",
     )
-    return f'<img src="board.svg" width="{BOARD_PX}" alt="chess board" />'
+    for old in ROOT.glob("board*.svg"):
+        if old != path:
+            old.unlink()
+    return f'<img src="{path.name}" width="{BOARD_PX}" alt="chess board" />'
 
 
 def _moves(board: chess.Board, repo: str) -> str:
