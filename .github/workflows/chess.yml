@@ -1,0 +1,42 @@
+name: Chess
+
+on:
+  issues:
+    types: [opened]
+
+concurrency:
+  group: readme-chess
+  cancel-in-progress: false
+
+jobs:
+  play:
+    if: startsWith(github.event.issue.title, 'Chess:')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - name: Play
+        run: |
+          uv run --with chess play.py play \
+            "${{ github.event.issue.title }}" \
+            "${{ github.event.issue.user.login }}" \
+            "${{ github.repository_owner }}" \
+            "${{ github.repository }}"
+      - name: Comment and close
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          COMMENT=$(python3 -c "import json; print(json.load(open('/tmp/chess-result.json'))['comment'])")
+          gh issue comment "${{ github.event.issue.number }}" --body "$COMMENT"
+          gh issue close "${{ github.event.issue.number }}" --reason completed
+      - name: Commit board
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add README.md data board.svg
+          git diff --cached --quiet && exit 0
+          git commit -m "${{ github.event.issue.title }} by ${{ github.event.issue.user.login }}"
+          git push
