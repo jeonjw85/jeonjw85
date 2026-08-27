@@ -1,6 +1,11 @@
 {
-  "fen": "rnbqkb1r/ppppnppp/8/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 2 3",
+  "fen": "rnbqkb1r/ppppnppp/8/4N3/4P3/8/PPPP1PPP/RNBQKB1R b KQkq - 0 3",
   "history": [
+    [
+      "move",
+      "jeonjw85",
+      "f3e5"
+    ],
     [
       "move",
       "Kangfdc",
@@ -30,7 +35,7 @@
   "scores": [
     [
       "jeonjw85",
-      2
+      3
     ],
     [
       "Kangfdc",
