@@ -1,3 +1,6 @@
-[![Donald Trump portrait](https://thumb.wikimedia.org/wikipedia/commons/thumb/1/19/January_2025_Official_Presidential_Portrait_of_Donald_J._Trump.jpg/250px-January_2025_Official_Presidential_Portrait_of_Donald_J._Trump.jpg)](https://commons.wikimedia.org/wiki/File:January_2025_Official_Presidential_Portrait_of_Donald_J._Trump.jpg)
+[![XERJ Corpus Hub contributor](https://hub.xerj.org/contributors/jeonjw85/badge.svg)](https://hub.xerj.org/contributors/jeonjw85)
+[![npm grassmaker downloads](https://img.shields.io/npm/dt/grassmaker?label=grassmaker&logo=npm&logoColor=white)](https://www.npmjs.com/package/grassmaker)
+[![npm refpin downloads](https://img.shields.io/npm/dt/refpin?label=refpin&logo=npm&logoColor=white)](https://www.npmjs.com/package/refpin)
+[![Docker pulls](https://img.shields.io/docker/pulls/jeonjw/rapid-photo-web?label=rapid-photo-web&logo=docker&logoColor=white)](https://hub.docker.com/r/jeonjw/rapid-photo-web)
 
 [![GitHub Stats](https://github-stats-extended.vercel.app/api?username=jeonjw85&theme=dark_github&number_format=long)](https://github-stats-extended.vercel.app/api?username=jeonjw85&theme=dark_github&number_format=long)
