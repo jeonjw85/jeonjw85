@@ -159,9 +159,19 @@ def test_segments_from_values_orders_projects_as_declared():
         "GRASSMAKER",
         "REFPIN",
         "RAPID-PHOTO-WEB",
-        "XERJ",
     ]
     assert segs[0].value == "★72"
     assert segs[1].value == "211/MO"
-    assert segs[-1].value == "CONTRIBUTOR"
-    assert segs[-1].accent is not None
+    assert segs[0].accent is not None
+
+
+def test_segments_do_not_include_third_party_membership():
+    """XERJ is rendered by its own service and stays a separate badge."""
+    values = {
+        "kenfold_stars": 72,
+        "aij_month": 211,
+        "npm_totals": {"grassmaker": 475, "refpin": 305},
+        "rapid_photo_web_pulls": 111,
+    }
+    labels = [s.label for s in sources.segments_from(values)]
+    assert "XERJ" not in labels

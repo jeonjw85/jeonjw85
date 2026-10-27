@@ -23,7 +23,6 @@ GITHUB_USER = "jeonjw85"
 DOCKER_IMAGE = "jeonjw/rapid-photo-web"
 
 SEGMENT_ACCENT = "#6bb3e8"
-XERJ_ACCENT = "#a78bfa"
 
 # Project order is a presentation decision: strongest signal first.
 NPM_PACKAGES = ("grassmaker", "refpin")
@@ -173,7 +172,6 @@ def segments_from(values: dict, compact: Callable[[int], str] | None = None) -> 
         Segment("GRASSMAKER", compact(totals["grassmaker"])),
         Segment("REFPIN", compact(totals["refpin"])),
         Segment("RAPID-PHOTO-WEB", compact(values["rapid_photo_web_pulls"])),
-        Segment("XERJ", "CONTRIBUTOR", XERJ_ACCENT),
     ]
 
 

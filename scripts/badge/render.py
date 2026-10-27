@@ -12,20 +12,21 @@ from typing import Iterable, Protocol
 from xml.sax.saxutils import escape
 
 # --- geometry (px) -----------------------------------------------------------
-# Tuned so six metrics fill a profile README's ~888px column at 1x: the strip is
-# the first thing on the page, so it must not read as fine print.
-HEIGHT = 36
-PAD = 18
-GAP = 17          # space on each side of a divider
-DIVIDER_W = 1
-RADIUS = 7
+# Tuned so the five metrics fill a profile README's ~888px column at 1x: the
+# strip is the first thing on the page, so it must not read as fine print.
+HEIGHT = 45
+PAD = 22.5
+GAP = 21.25        # space on each side of a divider
+DIVIDER_W = 1.25
+RADIUS = 8.75
 
-LABEL_SIZE = 12.0
-LABEL_TRACKING = 0.72
-LABEL_VALUE_GAP = 5
-VALUE_SIZE = 14.0
-VALUE_TRACKING = 0.1
-BASELINE = HEIGHT / 2 + 5.0
+LABEL_SIZE = 15.0
+LABEL_TRACKING = 0.9
+LABEL_VALUE_GAP = 6.25
+VALUE_SIZE = 17.5
+VALUE_TRACKING = 0.125
+BASELINE = HEIGHT / 2 + 6.25
+DIVIDER_H = HEIGHT * 0.5
 
 # --- colour ------------------------------------------------------------------
 BG_TOP = "#121e2c"
@@ -124,7 +125,7 @@ def build_strip(
         if index:
             x += GAP
             out.append(
-                f'<rect x="{x:.2f}" y="{HEIGHT / 2 - 9:.2f}" width="{DIVIDER_W}" height="18" '
+                f'<rect x="{x:.2f}" y="{(HEIGHT - DIVIDER_H) / 2:.2f}" width="{DIVIDER_W}" height="{DIVIDER_H}" '
                 f'fill="{DIVIDER}"/>'
             )
             x += DIVIDER_W + GAP
