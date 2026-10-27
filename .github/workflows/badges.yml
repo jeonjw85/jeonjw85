@@ -35,12 +35,12 @@ jobs:
 
       - name: Commit changes
         run: |
-          if git diff --quiet -- badges/header.svg; then
-            echo "badge strip is already up to date"
+          if git diff --quiet -- badges/; then
+            echo "badges are already up to date"
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add badges/header.svg
-          git commit -m "docs: refresh profile badge strip"
+          git add badges/
+          git commit -m "docs: refresh profile badges"
           git push

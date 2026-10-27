@@ -24,23 +24,28 @@ jobs:
       - name: Run generator tests
         run: python -m pytest scripts/badge -q
 
-      # The badge embeds live metrics, so a bare `--check` would fail whenever
-      # a number legitimately changed. Instead assert the committed file is a
-      # well-formed strip whose baked-in values still parse.
-      - name: Validate committed strip
+      # The strip embeds live metrics, so a bare `--check` would fail whenever
+      # a number legitimately changed. Instead assert both committed files are
+      # well-formed and that the strip's baked-in values still parse.
+      - name: Validate committed badges
         run: |
           python - <<'PY'
           from pathlib import Path
-          from scripts.badge import render, sources
+          from scripts.badge import sources
 
-          svg = Path("badges/header.svg").read_text()
-          assert svg.startswith("<svg"), "not an SVG"
-          assert svg.rstrip().endswith("</svg>"), "truncated SVG"
-          assert 'role="img"' in svg, "missing role"
-          previous = sources.read_previous(svg)
+          header = Path("badges/header.svg").read_text()
+          xerj = Path("badges/xerj.svg").read_text()
+
+          for name, svg in (("header", header), ("xerj", xerj)):
+              assert svg.startswith("<svg"), f"{name}: not an SVG"
+              assert svg.rstrip().endswith("</svg>"), f"{name}: truncated"
+              assert 'role="img"' in svg, f"{name}: missing role"
+              assert 'aria-label="' in svg, f"{name}: missing aria-label"
+
+          previous = sources.read_previous(header)
           required = {"kenfold_stars", "aij_month", "rapid_photo_web_pulls"}
           missing = required - previous.keys()
           assert not missing, f"unreadable metrics: {missing}"
           assert set(previous["npm_totals"]) == {"grassmaker", "refpin"}, previous["npm_totals"]
-          print("badge strip OK:", previous)
+          print("badges OK:", previous)
           PY
