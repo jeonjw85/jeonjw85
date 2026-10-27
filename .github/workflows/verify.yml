@@ -1,0 +1,46 @@
+name: Verify
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  badge:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install --disable-pip-version-check fonttools pytest
+
+      - name: Run generator tests
+        run: python -m pytest scripts/badge -q
+
+      # The badge embeds live metrics, so a bare `--check` would fail whenever
+      # a number legitimately changed. Instead assert the committed file is a
+      # well-formed strip whose baked-in values still parse.
+      - name: Validate committed strip
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from scripts.badge import render, sources
+
+          svg = Path("badges/header.svg").read_text()
+          assert svg.startswith("<svg"), "not an SVG"
+          assert svg.rstrip().endswith("</svg>"), "truncated SVG"
+          assert 'role="img"' in svg, "missing role"
+          previous = sources.read_previous(svg)
+          required = {"kenfold_stars", "aij_month", "rapid_photo_web_pulls"}
+          missing = required - previous.keys()
+          assert not missing, f"unreadable metrics: {missing}"
+          assert set(previous["npm_totals"]) == {"grassmaker", "refpin"}, previous["npm_totals"]
+          print("badge strip OK:", previous)
+          PY

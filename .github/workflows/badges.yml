@@ -1,0 +1,46 @@
+name: Badges
+
+on:
+  schedule:
+    # Mondays 03:17 UTC — off the hour to avoid GitHub's scheduler peak
+    - cron: "17 3 * * 1"
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "scripts/badge/**"
+      - ".github/workflows/badges.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install font toolkit
+        run: pip install --disable-pip-version-check fonttools
+
+      - name: Fetch Pretendard outlines
+        run: python -m scripts.badge.font --fetch
+
+      - name: Regenerate badge strip
+        run: python -m scripts.badge.main
+
+      - name: Commit changes
+        run: |
+          if git diff --quiet -- badges/header.svg; then
+            echo "badge strip is already up to date"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add badges/header.svg
+          git commit -m "docs: refresh profile badge strip"
+          git push

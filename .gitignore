@@ -1,0 +1,4 @@
+# generator cache — fonts are fetched, never committed
+scripts/badge/.font-cache/
+__pycache__/
+.pytest_cache/
