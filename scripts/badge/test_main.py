@@ -53,7 +53,7 @@ def test_generate_writes_svg_with_metrics(monkeypatch, tmp_path, faces):
 @pytest.fixture
 def badge_dir(monkeypatch, tmp_path):
     """Keep --check and write paths inside the test's tmp dir."""
-    monkeypatch.setattr(main, "XERJ_OUTPUT", tmp_path / "xerj.svg")
+    monkeypatch.setattr(main, "DEFAULT_OUTPUT", tmp_path / "header.svg")
     return tmp_path
 
 
@@ -61,32 +61,25 @@ def test_check_reports_stale_file(monkeypatch, tmp_path, faces, badge_dir):
     out = tmp_path / "header.svg"
     out.write_text("<svg>stale</svg>")
     monkeypatch.setattr(main, "generate", lambda output, **_: "<svg>fresh</svg>")
-    assert main.main(["--output", str(out), "--check"]) == 1
+    assert main.main(["--check"]) == 1
 
 
 def test_check_reports_up_to_date_file(monkeypatch, tmp_path, faces, badge_dir):
     out = tmp_path / "header.svg"
     out.write_text("<svg>same</svg>")
-    (tmp_path / "xerj.svg").write_text("<svg>xerj</svg>")
     monkeypatch.setattr(main, "generate", lambda output, **_: "<svg>same</svg>")
-    monkeypatch.setattr(main, "generate_xerj", lambda: "<svg>xerj</svg>")
-    assert main.main(["--output", str(out), "--check"]) == 0
+    assert main.main(["--check"]) == 0
 
 
-def test_check_reports_missing_xerj_badge(monkeypatch, tmp_path, faces, badge_dir):
-    out = tmp_path / "header.svg"
-    out.write_text("<svg>same</svg>")
+def test_check_reports_missing_badge(monkeypatch, tmp_path, faces, badge_dir):
     monkeypatch.setattr(main, "generate", lambda output, **_: "<svg>same</svg>")
-    assert main.main(["--output", str(out), "--check"]) == 1
+    assert main.main(["--check"]) == 1
 
 
-def test_write_creates_both_badges(monkeypatch, tmp_path, faces, badge_dir):
-    out = tmp_path / "header.svg"
+def test_write_creates_the_badge(monkeypatch, tmp_path, faces, badge_dir):
     monkeypatch.setattr(main, "generate", lambda output, **_: "<svg>header</svg>")
-    monkeypatch.setattr(main, "generate_xerj", lambda: "<svg>xerj</svg>")
-    assert main.main(["--output", str(out)]) == 0
-    assert out.read_text() == "<svg>header</svg>"
-    assert (tmp_path / "xerj.svg").read_text() == "<svg>xerj</svg>"
+    assert main.main([]) == 0
+    assert (tmp_path / "header.svg").read_text() == "<svg>header</svg>"
 
 
 def test_generate_reuses_previous_values_when_source_fails(monkeypatch, tmp_path, faces):

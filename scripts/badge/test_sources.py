@@ -64,8 +64,7 @@ def test_collect_reads_every_source():
     assert values["kenfold_stars"] == 72
     assert values["aij_month"] == 211
     assert values["rapid_photo_web_pulls"] == 111
-    assert values["npm_totals"]["grassmaker"] == 475
-    assert values["npm_totals"]["refpin"] == 475
+    assert values["npm_total"] == 950
 
 
 def test_collect_keeps_previous_value_when_a_source_fails():
@@ -149,29 +148,56 @@ def test_segments_from_values_orders_projects_as_declared():
     values = {
         "kenfold_stars": 72,
         "aij_month": 211,
-        "npm_totals": {"grassmaker": 475, "refpin": 305},
+        "npm_total": 780,
         "rapid_photo_web_pulls": 111,
     }
     segs = sources.segments_from(values)
     assert [s.label for s in segs] == [
         "KENFOLD",
         "AIJ",
-        "GRASSMAKER",
-        "REFPIN",
+        "NPM",
         "RAPID-PHOTO-WEB",
     ]
     assert segs[0].value == "★72"
     assert segs[1].value == "211/MO"
+    assert segs[2].value == "780"
     assert segs[0].accent is not None
 
 
 def test_segments_do_not_include_third_party_membership():
-    """XERJ is rendered by its own service and stays a separate badge."""
     values = {
         "kenfold_stars": 72,
         "aij_month": 211,
-        "npm_totals": {"grassmaker": 475, "refpin": 305},
+        "npm_total": 780,
         "rapid_photo_web_pulls": 111,
     }
     labels = [s.label for s in sources.segments_from(values)]
     assert "XERJ" not in labels
+
+
+def test_collect_falls_back_to_committed_npm_total_when_one_package_fails():
+    http = FakeHttp(
+        {
+            "api.github.com/repos/jeonjw85/kenfold": gh_stars(72),
+            "pypistats.org/api/packages/aij/recent": pypi_recent(211),
+            "api.npmjs.org/downloads/point/": ('{"error":"boom"}', 503),
+            "hub.docker.com/v2/repositories/jeonjw/rapid-photo-web/": docker_pulls(111),
+        }
+    )
+    warnings = []
+    values = sources.collect(http, previous={"npm_total": 780}, warn=warnings.append)
+
+    assert values["npm_total"] == 780
+    assert any("npm" in w for w in warnings)
+
+
+def test_read_previous_recovers_the_combined_npm_total():
+    svg = (
+        '<svg><g aria-label="KENFOLD ★72 | AIJ 211/MO | NPM 781 | '
+        'RAPID-PHOTO-WEB 111"></g></svg>'
+    )
+    previous = sources.read_previous(svg)
+    assert previous["npm_total"] == 781
+    assert previous["kenfold_stars"] == 72
+    assert previous["aij_month"] == 211
+    assert previous["rapid_photo_web_pulls"] == 111

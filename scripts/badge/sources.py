@@ -145,17 +145,23 @@ def collect(
             warn(f"{name}: {exc}; keeping previous value {previous[name]}")
             values[name] = previous[name]
 
-    totals = {}
-    previous_totals = previous.get("npm_totals", {})
+    npm_total = 0
+    npm_errors = []
     for package in NPM_PACKAGES:
         try:
-            totals[package] = _npm_total(http, package)
+            npm_total += _npm_total(http, package)
         except SourceError as exc:
-            if package not in previous_totals:
-                raise
-            warn(f"npm:{package}: {exc}; keeping previous value {previous_totals[package]}")
-            totals[package] = previous_totals[package]
-    values["npm_totals"] = totals
+            npm_errors.append(exc)
+
+    if npm_errors:
+        # The strip shows one combined npm figure, so a failed package falls back
+        # to the committed total rather than blanking or overstating it.
+        if previous.get("npm_total") is None:
+            raise npm_errors[0]
+        warn(f"npm: {npm_errors[0]}; keeping previous total {previous['npm_total']}")
+        values["npm_total"] = previous["npm_total"]
+    else:
+        values["npm_total"] = npm_total
 
     return values
 
@@ -165,12 +171,10 @@ def segments_from(values: dict, compact: Callable[[int], str] | None = None) -> 
     from .render import compact_number
 
     compact = compact or compact_number
-    totals = values["npm_totals"]
     return [
         Segment("KENFOLD", f"★{compact(values['kenfold_stars'])}", SEGMENT_ACCENT),
         Segment("AIJ", f"{compact(values['aij_month'])}/MO"),
-        Segment("GRASSMAKER", compact(totals["grassmaker"])),
-        Segment("REFPIN", compact(totals["refpin"])),
+        Segment("NPM", compact(values["npm_total"])),
         Segment("RAPID-PHOTO-WEB", compact(values["rapid_photo_web_pulls"])),
     ]
 
@@ -191,17 +195,16 @@ def read_previous(svg_text: str) -> dict:
         if len(parts) == 2:
             tokens[parts[0]] = parts[1]
 
-    previous: dict = {"npm_totals": {}}
+    previous: dict = {}
     if "KENFOLD" in tokens:
         previous["kenfold_stars"] = _parse_compact(tokens["KENFOLD"].lstrip("★"))
     if "AIJ" in tokens:
         previous["aij_month"] = _parse_compact(tokens["AIJ"].replace("/MO", ""))
-    for package, label in (("grassmaker", "GRASSMAKER"), ("refpin", "REFPIN")):
-        if label in tokens:
-            previous["npm_totals"][package] = _parse_compact(tokens[label])
+    if "NPM" in tokens:
+        previous["npm_total"] = _parse_compact(tokens["NPM"])
     if "RAPID-PHOTO-WEB" in tokens:
         previous["rapid_photo_web_pulls"] = _parse_compact(tokens["RAPID-PHOTO-WEB"])
-    return {k: v for k, v in previous.items() if v != {}}
+    return {k: v for k, v in previous.items() if v is not None}
 
 
 def _parse_compact(text: str) -> int | None:

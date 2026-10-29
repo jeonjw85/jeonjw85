@@ -29,7 +29,7 @@ def segments():
     return [
         render.Segment("KENFOLD", "★72", "#6bb3e8"),
         render.Segment("AIJ", "211/MO", None),
-        render.Segment("XERJ", "CONTRIBUTOR", "#a78bfa"),
+        render.Segment("NPM", "781", None),
     ]
 
 
@@ -37,29 +37,35 @@ def svg_width(svg):
     return float(re.search(r'width="([\d.]+)"', svg).group(1))
 
 
-def test_strip_width_counts_padding_gaps_and_dividers():
+def test_strip_width_is_fixed_to_match_the_stats_card():
     face = FakeFace()
     svg = render.build_strip(segments(), face, face)
+    assert svg_width(svg) == pytest.approx(render.WIDTH, abs=0.01)
+    assert render.WIDTH == 450
 
-    seg_w = 0.0
-    for s in segments():
-        _, lw = face.layout(s.label, render.LABEL_SIZE, render.LABEL_TRACKING)
-        _, vw = face.layout(s.value, render.VALUE_SIZE, render.VALUE_TRACKING)
-        seg_w += lw + render.LABEL_VALUE_GAP + vw
 
-    n = len(segments())
-    expected = (
-        render.PAD
-        + seg_w
-        + (n - 1) * (render.GAP + render.DIVIDER_W + render.GAP)
-        + render.PAD
+def test_narrow_content_is_centred_instead_of_left_padded():
+    face = FakeFace()
+    svg = render.build_strip([render.Segment("AIJ", "1")], face, face)
+    assert svg_width(svg) == pytest.approx(render.WIDTH, abs=0.01)
+
+    first_text_x = min(
+        float(x) for x in re.findall(r'translate\(([\d.]+) ', svg)
     )
-    assert svg_width(svg) == pytest.approx(round(expected), abs=0.01)
+    assert first_text_x > render.PAD
+
+
+def test_oversized_numbers_shrink_instead_of_widening_the_strip():
+    face = FakeFace(advance=30.0)
+    segments_ = [render.Segment("KENFOLD", "★100K"), render.Segment("AIJ", "100K/MO")]
+    svg = render.build_strip(segments_, face, face)
+    assert svg_width(svg) == pytest.approx(render.WIDTH, abs=0.01)
+
+    scales = [float(s) for s in re.findall(r'scale\(([\d.]+) ', svg)]
+    assert scales and all(scale <= render.LABEL_SIZE for scale in scales)
 
 
 def test_strip_does_not_repeat_the_profile_name():
-    """The profile header already shows the name; spending width on it twice
-    made the metrics read as fine print."""
     face = FakeFace()
     svg = render.build_strip(segments(), face, face)
     assert "JEONGWAN" not in svg
@@ -67,10 +73,46 @@ def test_strip_does_not_repeat_the_profile_name():
 
 
 def test_type_is_large_enough_to_read_at_1x():
-    """Guards the regression that started this: labels had shrunk to 9.5px."""
-    assert render.LABEL_SIZE >= 12
+    assert render.LABEL_SIZE >= 11
     assert render.VALUE_SIZE >= 13
     assert render.VALUE_SIZE > render.LABEL_SIZE
+
+
+def test_strip_stays_compact():
+    assert render.HEIGHT <= 32
+
+
+def _contrast(foreground, background):
+    def luminance(colour):
+        channels = [int(colour.lstrip("#")[i : i + 2], 16) / 255 for i in (0, 2, 4)]
+        linear = [
+            c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4 for c in channels
+        ]
+        return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2]
+
+    high, low = sorted((luminance(foreground), luminance(background)), reverse=True)
+    return (high + 0.05) / (low + 0.05)
+
+
+def test_text_stays_readable_on_the_dark_page():
+    for colour in (render.LABEL_COLOR, render.VALUE_NEUTRAL, render.DIVIDER):
+        assert _contrast(colour, render.BG) >= 1.5, colour
+    assert _contrast(render.LABEL_COLOR, render.BG) >= 4.5
+    assert _contrast(render.VALUE_NEUTRAL, render.BG) >= 4.5
+
+
+def test_strip_has_no_outline_or_gradient():
+    face = FakeFace()
+    svg = render.build_strip(segments(), face, face)
+    assert "stroke" not in svg
+    assert 'id="line"' not in svg
+    assert "linearGradient" not in svg
+    assert not hasattr(render, "LINE_FROM")
+    assert not hasattr(render, "BG_MID")
+
+
+def test_background_is_one_flat_colour():
+    assert render.BG == "#0d1117"
 
 
 def test_strip_svg_is_valid_root_and_has_accessible_label():
@@ -88,8 +130,8 @@ def test_strip_uses_accent_for_highlighted_values_and_neutral_otherwise():
     face = FakeFace()
     svg = render.build_strip(segments(), face, face)
     assert svg.count('fill="#6bb3e8"') >= 1
-    assert svg.count('fill="#a78bfa"') >= 1
     assert f'fill="{render.VALUE_NEUTRAL}"' in svg
+    assert 'fill="#a78bfa"' not in svg
 
 
 def test_strip_has_single_gradient_ids_and_no_duplicate_ids():

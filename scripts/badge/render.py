@@ -12,31 +12,28 @@ from typing import Iterable, Protocol
 from xml.sax.saxutils import escape
 
 # --- geometry (px) -----------------------------------------------------------
-# Tuned so the five metrics fill a profile README's ~888px column at 1x: the
-# strip is the first thing on the page, so it must not read as fine print.
-HEIGHT = 45
-PAD = 22.5
-GAP = 21.25        # space on each side of a divider
-DIVIDER_W = 1.25
-RADIUS = 8.75
+# Fixed to the stats card's width so the README column lines up instead of the
+# strip stretching to the viewport.
+WIDTH = 450.0
+HEIGHT = 32
+PAD = 16
+GAP = 12           # space on each side of a divider
+DIVIDER_W = 1
+RADIUS = 6.5
 
-LABEL_SIZE = 15.0
-LABEL_TRACKING = 0.9
-LABEL_VALUE_GAP = 6.25
-VALUE_SIZE = 17.5
-VALUE_TRACKING = 0.125
-BASELINE = HEIGHT / 2 + 6.25
+LABEL_SIZE = 11.0
+LABEL_TRACKING = 0.66
+LABEL_VALUE_GAP = 5.0
+VALUE_SIZE = 13.0
+VALUE_TRACKING = 0.09
 DIVIDER_H = HEIGHT * 0.5
 
 # --- colour ------------------------------------------------------------------
-BG_TOP = "#121e2c"
-BG_BOTTOM = "#0a1420"
-BORDER = "#ffffff21"
-DIVIDER = "#ffffff24"
-LABEL_COLOR = "#8b9cb2"
-VALUE_NEUTRAL = "#e9eff7"
-LINE_FROM = "#4a9bd8"
-LINE_TO = "#7c3aed"
+# GitHub's dark page colour: the strip has no panel of its own.
+BG = "#0d1117"
+DIVIDER = "#ffffff1c"
+LABEL_COLOR = "#7d8590"
+VALUE_NEUTRAL = "#e6edf3"
 
 
 class Face(Protocol):
@@ -78,6 +75,32 @@ def _glyphs(parts: Iterable[tuple[float, str]], x: float, baseline: float, scale
     )
 
 
+def _layout(
+    segments: list[Segment],
+    label_face: Face,
+    value_face: Face,
+    label_size: float,
+    value_size: float,
+    gap: float,
+) -> list[dict]:
+    label_tracking = label_size * (LABEL_TRACKING / LABEL_SIZE)
+    value_tracking = value_size * (VALUE_TRACKING / VALUE_SIZE)
+    label_gap = value_size * (LABEL_VALUE_GAP / VALUE_SIZE)
+
+    laid = []
+    for seg in segments:
+        lp, lw = label_face.layout(seg.label, label_size, label_tracking)
+        vp, vw = value_face.layout(seg.value, value_size, value_tracking)
+        laid.append(dict(seg=seg, lp=lp, lw=lw, vp=vp, vw=vw, gap=label_gap))
+    return laid
+
+
+def _content_width(laid: list[dict], gap: float) -> float:
+    return sum(item["lw"] + item["gap"] + item["vw"] for item in laid) + (
+        len(laid) - 1
+    ) * (gap + DIVIDER_W + gap)
+
+
 def build_strip(
     segments: list[Segment],
     label_face: Face,
@@ -86,53 +109,43 @@ def build_strip(
     if not segments:
         raise ValueError("at least one segment is required")
 
-    laid: list[dict] = []
-    for seg in segments:
-        lp, lw = label_face.layout(seg.label, LABEL_SIZE, LABEL_TRACKING)
-        vp, vw = value_face.layout(seg.value, VALUE_SIZE, VALUE_TRACKING)
-        laid.append(
-            dict(seg=seg, lp=lp, lw=lw, vp=vp, vw=vw, width=lw + LABEL_VALUE_GAP + vw)
-        )
+    # Oversized numbers shrink the type rather than widening the strip.
+    label_size, value_size, gap = LABEL_SIZE, VALUE_SIZE, GAP
+    laid = _layout(segments, label_face, value_face, label_size, value_size, gap)
+    content = _content_width(laid, gap)
+    limit = WIDTH - PAD * 2
+    if content > limit:
+        scale = limit / content
+        label_size *= scale
+        value_size *= scale
+        gap *= scale
+        laid = _layout(segments, label_face, value_face, label_size, value_size, gap)
+        content = _content_width(laid, gap)
 
-    seg_total = sum(item["width"] for item in laid)
-    between = GAP + DIVIDER_W + GAP
-    width = PAD + seg_total + (len(laid) - 1) * between + PAD
+    baseline = HEIGHT / 2 + label_size * 0.375
+    side = max(PAD, (WIDTH - content) / 2)
 
     label = " | ".join(f"{s.label} {s.value}" for s in segments)
     out: list[str] = [
-        f'<svg xmlns="http://www.w3.org/2000/svg" width="{width:.0f}" height="{HEIGHT}" '
-        f'viewBox="0 0 {width:.2f} {HEIGHT}" role="img" aria-label="{escape(label)}">',
-        "<defs>",
-        '<linearGradient id="bg" x1="0" y1="0" x2="1" y2="0">'
-        f'<stop offset="0" stop-color="{BG_TOP}"/>'
-        f'<stop offset="0.5" stop-color="#0c1723"/>'
-        f'<stop offset="1" stop-color="{BG_BOTTOM}"/></linearGradient>',
-        '<linearGradient id="line" x1="0" y1="0" x2="1" y2="0">'
-        f'<stop offset="0" stop-color="{LINE_FROM}" stop-opacity="0"/>'
-        f'<stop offset="0.25" stop-color="{LINE_FROM}" stop-opacity="0.6"/>'
-        f'<stop offset="0.7" stop-color="{LINE_TO}" stop-opacity="0.5"/>'
-        f'<stop offset="1" stop-color="{LINE_TO}" stop-opacity="0"/></linearGradient>',
-        "</defs>",
-        f'<rect width="{width:.2f}" height="{HEIGHT}" rx="{RADIUS}" fill="url(#bg)"/>',
-        f'<rect x="0.5" y="0.5" width="{width - 1:.2f}" height="{HEIGHT - 1}" '
-        f'rx="{RADIUS - 0.5:.1f}" fill="none" stroke="{BORDER}" stroke-width="1"/>',
-        f'<rect x="{RADIUS}" y="{HEIGHT - 1}" width="{width - RADIUS * 2:.2f}" height="1" fill="url(#line)"/>',
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{WIDTH:.0f}" height="{HEIGHT}" '
+        f'viewBox="0 0 {WIDTH:.2f} {HEIGHT}" role="img" aria-label="{escape(label)}">',
+        f'<rect width="{WIDTH:.2f}" height="{HEIGHT}" rx="{RADIUS}" fill="{BG}"/>',
     ]
 
-    x = PAD
+    x = side
     for index, item in enumerate(laid):
         seg: Segment = item["seg"]
         if index:
-            x += GAP
+            x += gap
             out.append(
                 f'<rect x="{x:.2f}" y="{(HEIGHT - DIVIDER_H) / 2:.2f}" width="{DIVIDER_W}" height="{DIVIDER_H}" '
                 f'fill="{DIVIDER}"/>'
             )
-            x += DIVIDER_W + GAP
-        out.append(f'<g fill="{LABEL_COLOR}">{_glyphs(item["lp"], x, BASELINE, LABEL_SIZE)}</g>')
-        x += item["lw"] + LABEL_VALUE_GAP
+            x += DIVIDER_W + gap
+        out.append(f'<g fill="{LABEL_COLOR}">{_glyphs(item["lp"], x, baseline, label_size)}</g>')
+        x += item["lw"] + item["gap"]
         color = seg.accent or VALUE_NEUTRAL
-        out.append(f'<g fill="{color}">{_glyphs(item["vp"], x, BASELINE, VALUE_SIZE)}</g>')
+        out.append(f'<g fill="{color}">{_glyphs(item["vp"], x, baseline, value_size)}</g>')
         x += item["vw"]
 
     out.append("</svg>")
