@@ -46,8 +46,17 @@ def pypi_recent(count):
     return json.dumps({"data": {"last_month": count}})
 
 
-def docker_pulls(count):
-    return json.dumps({"pull_count": count})
+def docker_page(counts, next_url=None):
+    return json.dumps(
+        {
+            "count": len(counts),
+            "next": next_url,
+            "results": [
+                {"name": f"image-{index}", "pull_count": count}
+                for index, count in enumerate(counts)
+            ],
+        }
+    )
 
 
 def test_collect_reads_every_source():
@@ -56,14 +65,14 @@ def test_collect_reads_every_source():
             "api.github.com/repos/jeonjw85/kenfold": gh_stars(72),
             "pypistats.org/api/packages/aij/recent": pypi_recent(211),
             "api.npmjs.org/downloads/point/": npm_total(475),
-            "hub.docker.com/v2/repositories/jeonjw/rapid-photo-web/": docker_pulls(111),
+            "hub.docker.com/v2/repositories/jeonjw/": docker_page([111]),
         }
     )
     values = sources.collect(http)
 
     assert values["kenfold_stars"] == 72
     assert values["aij_month"] == 211
-    assert values["rapid_photo_web_pulls"] == 111
+    assert values["docker_pulls"] == 111
     assert values["npm_total"] == 950
 
 
@@ -73,7 +82,7 @@ def test_collect_keeps_previous_value_when_a_source_fails():
             "api.github.com/repos/jeonjw85/kenfold": (gh_stars(72), 200),
             "pypistats.org/api/packages/aij/recent": ('{"error":"boom"}', 503),
             "api.npmjs.org/downloads/point/": npm_total(475),
-            "hub.docker.com/v2/repositories/jeonjw/rapid-photo-web/": docker_pulls(111),
+            "hub.docker.com/v2/repositories/jeonjw/": docker_page([111]),
         }
     )
     previous = {"aij_month": 190}
@@ -90,7 +99,7 @@ def test_collect_raises_when_a_source_fails_and_no_previous_value():
             "api.github.com/repos/jeonjw85/kenfold": (gh_stars(72), 500),
             "pypistats.org/api/packages/aij/recent": pypi_recent(211),
             "api.npmjs.org/downloads/point/": npm_total(475),
-            "hub.docker.com/v2/repositories/jeonjw/rapid-photo-web/": docker_pulls(111),
+            "hub.docker.com/v2/repositories/jeonjw/": docker_page([111]),
         }
     )
     with pytest.raises(sources.SourceError):
@@ -103,7 +112,7 @@ def test_collect_rejects_non_integer_payloads():
             "api.github.com/repos/jeonjw85/kenfold": json.dumps({"stargazers_count": "72"}),
             "pypistats.org/api/packages/aij/recent": pypi_recent(211),
             "api.npmjs.org/downloads/point/": npm_total(475),
-            "hub.docker.com/v2/repositories/jeonjw/rapid-photo-web/": docker_pulls(111),
+            "hub.docker.com/v2/repositories/jeonjw/": docker_page([111]),
         }
     )
     with pytest.raises(sources.SourceError):
@@ -149,18 +158,19 @@ def test_segments_from_values_orders_projects_as_declared():
         "kenfold_stars": 72,
         "aij_month": 211,
         "npm_total": 780,
-        "rapid_photo_web_pulls": 111,
+        "docker_pulls": 111,
     }
     segs = sources.segments_from(values)
     assert [s.label for s in segs] == [
         "KENFOLD",
         "AIJ",
         "NPM",
-        "RAPID-PHOTO-WEB",
+        "DOCKER",
     ]
     assert segs[0].value == "★72"
     assert segs[1].value == "211/MO"
     assert segs[2].value == "780"
+    assert segs[3].value == "111"
     assert segs[0].accent is not None
 
 
@@ -169,7 +179,7 @@ def test_segments_do_not_include_third_party_membership():
         "kenfold_stars": 72,
         "aij_month": 211,
         "npm_total": 780,
-        "rapid_photo_web_pulls": 111,
+        "docker_pulls": 111,
     }
     labels = [s.label for s in sources.segments_from(values)]
     assert "XERJ" not in labels
@@ -181,7 +191,7 @@ def test_collect_falls_back_to_committed_npm_total_when_one_package_fails():
             "api.github.com/repos/jeonjw85/kenfold": gh_stars(72),
             "pypistats.org/api/packages/aij/recent": pypi_recent(211),
             "api.npmjs.org/downloads/point/": ('{"error":"boom"}', 503),
-            "hub.docker.com/v2/repositories/jeonjw/rapid-photo-web/": docker_pulls(111),
+            "hub.docker.com/v2/repositories/jeonjw/": docker_page([111]),
         }
     )
     warnings = []
@@ -194,10 +204,53 @@ def test_collect_falls_back_to_committed_npm_total_when_one_package_fails():
 def test_read_previous_recovers_the_combined_npm_total():
     svg = (
         '<svg><g aria-label="KENFOLD ★72 | AIJ 211/MO | NPM 781 | '
-        'RAPID-PHOTO-WEB 111"></g></svg>'
+        'DOCKER 111"></g></svg>'
     )
     previous = sources.read_previous(svg)
     assert previous["npm_total"] == 781
     assert previous["kenfold_stars"] == 72
     assert previous["aij_month"] == 211
-    assert previous["rapid_photo_web_pulls"] == 111
+    assert previous["docker_pulls"] == 111
+
+
+def test_docker_total_sums_pull_counts_across_public_images():
+    http = FakeHttp(
+        {
+            "api.github.com/repos/jeonjw85/kenfold": gh_stars(72),
+            "pypistats.org/api/packages/aij/recent": pypi_recent(211),
+            "api.npmjs.org/downloads/point/": npm_total(475),
+            "hub.docker.com/v2/repositories/jeonjw/": docker_page([100, 12]),
+        }
+    )
+    values = sources.collect(http)
+
+    assert values["docker_pulls"] == 112
+
+
+def test_docker_total_follows_pagination():
+    second_page = "https://hub.docker.com/v2/repositories/jeonjw/?page=2&page_size=100"
+    http = FakeHttp(
+        {
+            "page=2": docker_page([12, 3]),
+            "hub.docker.com/v2/repositories/jeonjw/": docker_page([100], next_url=second_page),
+            "api.github.com/repos/jeonjw85/kenfold": gh_stars(72),
+            "pypistats.org/api/packages/aij/recent": pypi_recent(211),
+            "api.npmjs.org/downloads/point/": npm_total(475),
+        }
+    )
+    values = sources.collect(http)
+
+    assert values["docker_pulls"] == 115
+
+
+def test_docker_total_rejects_a_payload_without_results():
+    http = FakeHttp(
+        {
+            "api.github.com/repos/jeonjw85/kenfold": gh_stars(72),
+            "pypistats.org/api/packages/aij/recent": pypi_recent(211),
+            "api.npmjs.org/downloads/point/": npm_total(475),
+            "hub.docker.com/v2/repositories/jeonjw/": json.dumps({"count": 0}),
+        }
+    )
+    with pytest.raises(sources.SourceError):
+        sources.collect(http)

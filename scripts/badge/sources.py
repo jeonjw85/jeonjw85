@@ -20,7 +20,7 @@ from .render import Segment
 
 NPM_TOTAL_SINCE = "2015-01-10"
 GITHUB_USER = "jeonjw85"
-DOCKER_IMAGE = "jeonjw/rapid-photo-web"
+DOCKER_NAMESPACE = "jeonjw"
 
 SEGMENT_ACCENT = "#6bb3e8"
 
@@ -108,9 +108,27 @@ def _npm_total(http: Http, package: str) -> int:
     return _int_field(payload, "downloads")
 
 
-def _docker_pulls(http: Http) -> int:
-    payload = _fetch(http, f"https://hub.docker.com/v2/repositories/{DOCKER_IMAGE}/")
-    return _int_field(payload, "pull_count")
+def _docker_total_pulls(http: Http) -> int:
+    """Sum pull counts over every public image in the namespace.
+
+    Docker Hub lists only public repositories for an unauthenticated read, so
+    this follows the namespace rather than a hard-coded image list and new
+    images count as soon as they are pushed.
+    """
+    url = f"https://hub.docker.com/v2/repositories/{DOCKER_NAMESPACE}/?page_size=100"
+    total = 0
+    while url:
+        payload = _fetch(http, url)
+        results = payload.get("results") if isinstance(payload, dict) else None
+        if not isinstance(results, list):
+            raise SourceError(f"{url}: missing results list")
+        for repository in results:
+            total += _int_field(repository, "pull_count")
+        next_url = payload.get("next")
+        if next_url is not None and not isinstance(next_url, str):
+            raise SourceError(f"{url}: invalid next link {next_url!r}")
+        url = next_url
+    return total
 
 
 def _today() -> str:
@@ -122,7 +140,7 @@ def _today() -> str:
 SIMPLE_SOURCES = {
     "kenfold_stars": _github_stars,
     "aij_month": _pypi_monthly,
-    "rapid_photo_web_pulls": _docker_pulls,
+    "docker_pulls": _docker_total_pulls,
 }
 
 
@@ -175,7 +193,7 @@ def segments_from(values: dict, compact: Callable[[int], str] | None = None) -> 
         Segment("KENFOLD", f"★{compact(values['kenfold_stars'])}", SEGMENT_ACCENT),
         Segment("AIJ", f"{compact(values['aij_month'])}/MO"),
         Segment("NPM", compact(values["npm_total"])),
-        Segment("RAPID-PHOTO-WEB", compact(values["rapid_photo_web_pulls"])),
+        Segment("DOCKER", compact(values["docker_pulls"])),
     ]
 
 
@@ -202,8 +220,8 @@ def read_previous(svg_text: str) -> dict:
         previous["aij_month"] = _parse_compact(tokens["AIJ"].replace("/MO", ""))
     if "NPM" in tokens:
         previous["npm_total"] = _parse_compact(tokens["NPM"])
-    if "RAPID-PHOTO-WEB" in tokens:
-        previous["rapid_photo_web_pulls"] = _parse_compact(tokens["RAPID-PHOTO-WEB"])
+    if "DOCKER" in tokens:
+        previous["docker_pulls"] = _parse_compact(tokens["DOCKER"])
     return {k: v for k, v in previous.items() if v is not None}
 
 

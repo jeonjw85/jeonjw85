@@ -20,7 +20,11 @@ def canned_http(monkeypatch, stars=72, month=211, npm=475, pulls=111):
         "api.github.com": {"stargazers_count": stars},
         "pypistats.org": {"data": {"last_month": month}},
         "api.npmjs.org": {"downloads": npm},
-        "hub.docker.com": {"pull_count": pulls},
+        "hub.docker.com": {
+            "count": 1,
+            "next": None,
+            "results": [{"name": "an-image", "pull_count": pulls}],
+        },
     }
 
     class Response:
