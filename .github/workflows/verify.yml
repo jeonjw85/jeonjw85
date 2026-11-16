@@ -41,7 +41,7 @@ jobs:
           assert 'aria-label="' in header, "header: missing aria-label"
 
           previous = sources.read_previous(header)
-          required = {"kenfold_stars", "aij_month", "npm_total", "docker_pulls"}
+          required = {"kenfold_stars", "pkg_month", "npm_total", "docker_pulls"}
           missing = required - previous.keys()
           assert not missing, f"unreadable metrics: {missing}"
           assert 'width="450"' in header, "strip must stay 450px wide"

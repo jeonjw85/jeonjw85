@@ -1,5 +1,6 @@
 """Tests for the regenerate/check entrypoint."""
 import json
+from datetime import date
 
 import pytest
 
@@ -15,7 +16,7 @@ def faces(monkeypatch):
     monkeypatch.setattr(font, "load", lambda weight: Face())
 
 
-def canned_http(monkeypatch, stars=72, month=211, npm=475, pulls=111):
+def canned_http(monkeypatch, stars=72, month=211, npm=475, pulls=111, crates=28):
     payloads = {
         "api.github.com": {"stargazers_count": stars},
         "pypistats.org": {"data": {"last_month": month}},
@@ -24,6 +25,15 @@ def canned_http(monkeypatch, stars=72, month=211, npm=475, pulls=111):
             "count": 1,
             "next": None,
             "results": [{"name": "an-image", "pull_count": pulls}],
+        },
+        "crates.io/api/v1/crates/e2ee-kit/downloads": {
+            "version_downloads": [
+                {"version": 1, "date": date.today().isoformat(), "downloads": crates}
+            ]
+        },
+        "crates.io/api/v1/crates?user_id": {
+            "crates": [{"name": "e2ee-kit"}],
+            "meta": {"next_page": None},
         },
     }
 

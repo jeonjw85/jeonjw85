@@ -13,6 +13,7 @@ import json
 import re
 import urllib.request
 from dataclasses import dataclass
+from datetime import date, timedelta
 from typing import Callable, Protocol
 from urllib.error import URLError
 
@@ -21,6 +22,10 @@ from .render import Segment
 NPM_TOTAL_SINCE = "2015-01-10"
 GITHUB_USER = "jeonjw85"
 DOCKER_NAMESPACE = "jeonjw"
+# crates.io user id, resolved from the crate owners endpoint
+# (https://crates.io/api/v1/crates/<crate>/owners); the API has no login lookup.
+CRATES_USER_ID = 437892
+MONTH_DAYS = 30
 
 SEGMENT_ACCENT = "#6bb3e8"
 
@@ -99,6 +104,54 @@ def _pypi_monthly(http: Http) -> int:
     return _int_field(data, "last_month")
 
 
+def _crates_monthly(http: Http) -> int:
+    """Sum the last 30 days of downloads over every crate the user owns."""
+    total = 0
+    page = 1
+    while page:
+        payload = _fetch(
+            http,
+            f"https://crates.io/api/v1/crates?user_id={CRATES_USER_ID}"
+            f"&per_page=100&page={page}",
+        )
+        crates = payload.get("crates") if isinstance(payload, dict) else None
+        if not isinstance(crates, list):
+            raise SourceError("crates.io: missing crate list")
+        for crate in crates:
+            name = crate.get("name") if isinstance(crate, dict) else None
+            if not isinstance(name, str) or not name:
+                raise SourceError(f"crates.io: invalid crate entry {crate!r}")
+            total += _crate_month(http, name)
+        meta = payload.get("meta")
+        next_page = meta.get("next_page") if isinstance(meta, dict) else None
+        if not isinstance(next_page, int) or next_page <= page:
+            page = None
+        else:
+            page = next_page
+    return total
+
+
+def _crate_month(http: Http, crate: str) -> int:
+    payload = _fetch(http, f"https://crates.io/api/v1/crates/{crate}/downloads")
+    rows = payload.get("version_downloads") if isinstance(payload, dict) else None
+    if not isinstance(rows, list):
+        raise SourceError(f"crates.io/{crate}: missing version_downloads")
+    cutoff = date.today() - timedelta(days=MONTH_DAYS - 1)
+    total = 0
+    for row in rows:
+        downloads = _int_field(row, "downloads")
+        raw_date = row.get("date") if isinstance(row, dict) else None
+        if not isinstance(raw_date, str):
+            raise SourceError(f"crates.io/{crate}: invalid date {raw_date!r}")
+        try:
+            day = date.fromisoformat(raw_date[:10])
+        except ValueError as exc:
+            raise SourceError(f"crates.io/{crate}: invalid date {raw_date!r}") from exc
+        if day >= cutoff:
+            total += downloads
+    return total
+
+
 def _npm_total(http: Http, package: str) -> int:
     payload = _fetch(
         http,
@@ -132,14 +185,11 @@ def _docker_total_pulls(http: Http) -> int:
 
 
 def _today() -> str:
-    from datetime import date
-
     return date.today().isoformat()
 
 
 SIMPLE_SOURCES = {
     "kenfold_stars": _github_stars,
-    "aij_month": _pypi_monthly,
     "docker_pulls": _docker_total_pulls,
 }
 
@@ -181,6 +231,23 @@ def collect(
     else:
         values["npm_total"] = npm_total
 
+    pkg_total = 0
+    pkg_errors = []
+    for reader in (_pypi_monthly, _crates_monthly):
+        try:
+            pkg_total += reader(http)
+        except SourceError as exc:
+            pkg_errors.append(exc)
+
+    if pkg_errors:
+        # PyPI and crates.io share one figure for the same reason npm does.
+        if previous.get("pkg_month") is None:
+            raise pkg_errors[0]
+        warn(f"pkg: {pkg_errors[0]}; keeping previous total {previous['pkg_month']}")
+        values["pkg_month"] = previous["pkg_month"]
+    else:
+        values["pkg_month"] = pkg_total
+
     return values
 
 
@@ -191,7 +258,7 @@ def segments_from(values: dict, compact: Callable[[int], str] | None = None) -> 
     compact = compact or compact_number
     return [
         Segment("KENFOLD", f"★{compact(values['kenfold_stars'])}", SEGMENT_ACCENT),
-        Segment("AIJ", f"{compact(values['aij_month'])}/MO"),
+        Segment("PY+RS", f"{compact(values['pkg_month'])}/MO"),
         Segment("NPM", compact(values["npm_total"])),
         Segment("DOCKER", compact(values["docker_pulls"])),
     ]
@@ -216,8 +283,8 @@ def read_previous(svg_text: str) -> dict:
     previous: dict = {}
     if "KENFOLD" in tokens:
         previous["kenfold_stars"] = _parse_compact(tokens["KENFOLD"].lstrip("★"))
-    if "AIJ" in tokens:
-        previous["aij_month"] = _parse_compact(tokens["AIJ"].replace("/MO", ""))
+    if "PY+RS" in tokens:
+        previous["pkg_month"] = _parse_compact(tokens["PY+RS"].replace("/MO", ""))
     if "NPM" in tokens:
         previous["npm_total"] = _parse_compact(tokens["NPM"])
     if "DOCKER" in tokens:
